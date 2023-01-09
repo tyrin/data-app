@@ -17,22 +17,24 @@ def showresults(frame, file): #-----------displays data frame and lets you downl
 	#HtmlFile = open("data.html", 'r', encoding='utf-8')
 	#source_code = HtmlFile.read()
 	#components.html(source_code, height = 775,width=900)
-	st.dataframe(frame)
+	sf = frame.astype(str)
+	st.dataframe(sf)
 	csv = convert_df(frame)
 	csvname = file + ".csv"
+	keyname = file + 'download-csv'
 	st.download_button(
 	   "Press to Download",
 	   csv,
 	   csvname,
 	   "text/csv",
-	   key='download-csv'
+	   key=keyname
 	)
-def mergeframes(leftframe, rightframe, column):#---merges two tables based on the Username column
+def mergeframes(leftframe, rightframe, column):#---merges two tables based on the  column
 	#mergeframe = pd.merge(leftframe, rightframe, on=["Username"])
 	mergeframe = pd.merge(rightframe, leftframe, how="outer", on=column)
 #	st.write(mergeframe.shape)
 	return(mergeframe)
-def comboframes(leftframe, rightframe, column):#---merges two tables based on the Username column
+def comboframes(leftframe, rightframe, column):#---merges two tables based on the column
 	comboframe = pd.merge(rightframe, leftframe, how="outer", on=column)
 #	st.write(mergeframe.shape)
 	return(comboframe)
@@ -44,7 +46,7 @@ def main():
 	todo = st.sidebar.selectbox("Do you want to:",
 		['<select>', "Enhance Confluence Data", "Merge Two Files", "Beta"])
 
-#---------------------------Sidebar Logic --------------------------
+#---------------------------Sidebar and Page Logic --------------------------
 	if todo == "<select>":
 		st.write("Use the sidebar to the left to select about views or edits of Confluence pages.")
 
@@ -63,43 +65,82 @@ def main():
 				confdata['Username'] = confdata['Username'].astype(str)  + "@salesforce.com"
 			st.write("Enter the name of the column used to combine the files:")
 			colname = st.text_input('Column name')
-			vf = mergeframes(otherdata, confdata, colname)
+			# if not string or if string best way to test for string existence instead of if not None
+			if colname:
+				vf = mergeframes(otherdata, confdata, colname)
 
-			#drop null values, because otherwise the data can't be used.
-			UseIncomplete = st.sidebar.radio("Use incomplete data?", ('Yes','No')) #---------------Use Incomplete Data or Not?
-			if UseIncomplete == 'No':
-				vf = vf.dropna()
-			else:
-				vf = vf.fillna(value='Unknown')
-			if colname is not None:
-				graphs(vf, selectviz, todo)
+				#drop null values, because otherwise the data can't be used.
+				UseIncomplete = st.sidebar.radio("Use incomplete data?", ('Yes','No')) #---------------Use Incomplete Data or Not?
+				if UseIncomplete == 'No':
+					vf = vf.dropna()
+				else:
+					vf = vf.fillna(value='Unknown')
+					graphs(vf, selectviz, todo)
+		else:
+			st.write("Select a file")
+#---------------------------Combine Files --------------------------
 	if todo == "Merge Two Files":
 		st.markdown('### Combine two files')
 		uploaded_files = st.file_uploader("Step 1: select two files to combine.", accept_multiple_files=True)
 		if len(uploaded_files) < 2 or len(uploaded_files) > 2:
-			st.write("Select exactly 2 files")
+			st.write("Upload exactly 2 files")
 		if len(uploaded_files) == 2:
-			file1 = pd.read_csv(uploaded_files[0])
-			file2 = pd.read_csv(uploaded_files[1])
+			file0 = pd.read_csv(uploaded_files[0])
+			file1 = pd.read_csv(uploaded_files[1])
+
 			st.write("Enter the name of the column used to combine the files:")
 			combo = st.text_input('Column name')
-			if combo is not None:
-				st.write("Combine on column: " + combo)
-				cf = comboframes(file1, file2, combo)
-			#View the data?
-			option = st.selectbox('Do you want to view, visualize, or download data?',
-			('View Data', 'Visualize Data', 'Download Data'))
-			if option == 'View Data':
+			if combo:
+#				st.write("Combine on column: " + combo)
+				cf = comboframes(file0, file1, combo)
+				#View the data?
+				option = st.selectbox('Do you want to edit, view, or visualize data?',
+				('View and Download Data', 'Edit Data','Visualize Data'))
+			#-------------EDIT FILES
+			if option == 'Edit Data':
+				#Select a file to edit
+				file0name = uploaded_files[0].name
+				file1name = uploaded_files[1].name
+				# Finding Common columns
+				#a = np.intersect1d(df2.columns, df1.columns)
+
+			# Printing common columns
+			#st.write("Common Columns:",a)
+				editfilename = st.selectbox('Select a file to edit',
+				(uploaded_files[0].name, uploaded_files[1].name))
+#				Replace a column name
+				st.write(editfilename)
+				st.write("Replace a column name:")
+				if editfilename == file0name:
+					st.write("Use " + file0name)
+				if editfilename == file1name:
+					st.write("Use " + file1name)
+#				df.rename(columns = {'old_col1':'new_col1'}, inplace = True)
+#				Append a string to a column
+#				Remove lines from a file
+			#-------------VIEW AND DOWNLOAD
+			if option == 'View and Download Data':
+				viewfile0 = st.checkbox("Uploaded Files", value=True,)
+				viewcombofile = st.checkbox('Combined File', value=True,)
 			#	st.write(mergeframe.shape)
-				st.write("Filename:", uploaded_files[0].name)
-				st.write("Records and columns:", file1.shape)
-				st.write(file1)
-				st.write("filename:", uploaded_files[1].name)
-				st.write("Records and columns:", file2.shape)
-				st.write(file2)
-				st.write("filename: combo.csv")
-				st.write("Records and columns:", cf.shape)
-				st.dataframe(cf)
+				if viewfile0:
+					st.write("Filename:", uploaded_files[0].name)
+					st.write("Records and columns:", file0.shape)
+					#st.write(file0)
+					showresults(file0, uploaded_files[0].name)
+					st.write("Filename:", uploaded_files[1].name)
+					st.write("Records and columns:", file1.shape)
+					#st.write(file1)
+					showresults(file1, uploaded_files[1].name)
+				if viewcombofile:
+					st.write("Filename: combo.csv")
+					st.write("Records and columns:", cf.shape)
+					#st.dataframe(cf)
+					showresults(cf, "combinedfile")
+			#-------------VISUALIZE DATA
+			if option == 'Visualize Data':
+				comboviz = st.sidebar.radio("Select a visualization", ('Stacked Bar Graph', 'Organizational Sunburst', 'Parallel Categories'))
+				graphs(cf, comboviz, "combofile")
 #		for uploaded_file in uploaded_files:
 #			#bytes_data = uploaded_file.read()
 #			st.write("filename:", uploaded_file.name)
@@ -109,9 +150,10 @@ def main():
 #--------------------SELECT GRAPH TYPE-------------------------
 def graphs(df, selectviz, todo):
 	#Get unique values for user input
-	spaces = df['Space Name'].unique()
-	orgs = df['Cost Center'].unique()
-	roles = df['Role'].unique()
+
+	#spaces = df['Space Name'].unique()
+	#orgs = df['Cost Center'].unique()
+	#roles = df['Role'].unique()
 	if selectviz == "Stacked Bar Graph":
 		st.header( selectviz + " for Views")
 		viewstackedbartitle = "Views By "
@@ -153,13 +195,19 @@ def stackedbar(frame, title):
 	colseg = colsort
 	col1, col2= st.columns(2)
 	with col1:
-#		st.markdown('**Bars:**')
+		st.markdown('**Bars:**')
 #		st.write(collist)
-		xselect = st.selectbox('Select Columns:', colbar)
+		xselect = st.selectbox('Select data for bar graph:', colbar)
+		cselect = st.selectbox('Select data for bar segments:', colseg)
 	with col2:
+		st.markdown('**Filters:**')
 #		st.markdown('**Colors:**')
-		cselect = st.selectbox('Select Segments:', colseg)
-
+		fselect = st.selectbox('Select data to filter on:', colbar)
+		st.write("Enter the name of the column used to combine the files:")
+		filtertext = st.text_input('Enter text to filter on')
+		#col = "account"
+		#df1[col].isin(df2[col].values)
+	writerfilter = st.radio("Remove writers and editors?:", ('View Data', 'Edit Data',))
 	fig = px.histogram(frame, x=xselect, color=cselect)
 	fig.update_layout(
 		height=600,
